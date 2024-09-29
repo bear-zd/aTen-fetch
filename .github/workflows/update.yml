@@ -1,0 +1,29 @@
+name: Update ATen Source
+
+on:
+  schedule:
+    - cron: '0 0 * * 0' 
+  workflow_dispatch: 
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Setup Git
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+
+    - name: Run update script
+      run: bash update_aten.sh
+
+    - name: Commit and push changes
+      run: |
+        git add -A
+        git commit -m "Update ATen source"
+        git push
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
