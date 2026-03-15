@@ -17,6 +17,7 @@
 #include <ATen/Functions.h>
 #include <ATen/NativeFunctions.h>
 #else
+#include <ATen/ops/_cholesky_solve_helper_native.h>
 #include <ATen/ops/_linalg_solve_ex_native.h>
 #include <ATen/ops/addbmm_native.h>
 #include <ATen/ops/addmm_native.h>
@@ -1078,6 +1079,11 @@ static Tensor& tiled_bmm_out_mps_impl(const Tensor& batch1, const Tensor& batch2
 }
 
 static Tensor& bmm_out_mps_impl(const Tensor& batch1, const Tensor& batch2, Tensor& result) {
+  TORCH_CHECK(batch1.scalar_type() == batch2.scalar_type(),
+              "Expected arguments of same type but got ",
+              batch1.scalar_type(),
+              " and ",
+              batch2.scalar_type());
   using namespace mps;
 
   // Matmul not supported if any output dimension size is larger than 2**32
@@ -1741,6 +1747,28 @@ Tensor& linalg_solve_triangular_mps_out(const Tensor& A,
 Tensor linalg_solve_triangular_mps(const Tensor& A, const Tensor& B, bool upper, bool left, bool unitriangular) {
   Tensor out = at::empty({0}, A.scalar_type(), std::nullopt, kMPS, std::nullopt, MemoryFormat::Contiguous);
   mps::linalg_solve_triangular_mps_impl(A, B, upper, /*transpose=*/false, left, unitriangular, out);
+  return out;
+}
+
+Tensor _cholesky_solve_helper_mps(const Tensor& self, const Tensor& A, bool upper) {
+  auto out = at::empty({0}, self.options().memory_format(MemoryFormat::Contiguous));
+  const bool first_transpose = upper;
+  const bool second_transpose = !upper;
+
+  mps::linalg_solve_triangular_mps_impl(A,
+                                        self,
+                                        upper,
+                                        first_transpose,
+                                        /*left=*/true,
+                                        /*unitriangular=*/false,
+                                        out);
+  mps::linalg_solve_triangular_mps_impl(A,
+                                        out,
+                                        upper,
+                                        second_transpose,
+                                        /*left=*/true,
+                                        /*unitriangular=*/false,
+                                        out);
   return out;
 }
 
